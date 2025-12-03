@@ -1,4 +1,4 @@
-import Savingsplan from "../models/savPlan.model.js";
+import Savingsplan from "../models/user.model.js";
 
 
 //for a new user to create a savings plan

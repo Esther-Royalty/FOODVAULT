@@ -12,7 +12,7 @@ app.use(cors());
 app.use(express.json());
 
 import authRoutes from "./routes/auth.routes.js";
-import savingsRoutes from "./routes/savPlan.routes.js";
+import savingsRoutes from "./routes/user.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 
 
