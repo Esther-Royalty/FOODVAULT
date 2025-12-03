@@ -4,14 +4,13 @@ import Savingsplan from "../models/savPlan.model.js";
 //for a new user to create a savings plan
 export const createSavingsPlan = async (req, res) => {
   try {
-    const {  userId,foodType, targetAmount, frequency } = req.body;
+    const {  foodType, targetAmount, frequency } = req.body;
 
     const plan = await Savingsplan.create({
-      userId,
       foodType,
       targetAmount: Number(targetAmount),
       frequency,
-      // nextDeductionDate: Date.now()
+  
     });
 
     res.json({ message: "Savings plan created successfully", plan });
@@ -25,8 +24,8 @@ export const createSavingsPlan = async (req, res) => {
 export const getMyPlans = async (req, res) => {
   try {
 
-    const { userId } = req.params;
-    const plans = await Savingsplan.find({ userId });
+    const userId = req.user.id;
+    const plans = await Savingsplan.find({ userId: mongoose.Types.ObjectId(req.params.userId) });
 
     res.status(200).json({ message: "Savings plans retrieved successfully", plans });
   } catch (error) {

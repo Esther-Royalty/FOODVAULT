@@ -1,11 +1,11 @@
 import mongoose from "mongoose";
 
 const SavingsPlanSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true,
-  },
+  // userId: {
+  //   type: mongoose.Schema.Types.ObjectId,
+  //   ref: "User",
+  //   required: true,
+  // },
 
   foodType: { type: String,
      required: true },       // e.g "Rice", "Beans"
