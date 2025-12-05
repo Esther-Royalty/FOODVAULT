@@ -1,23 +1,35 @@
+
 import mongoose from "mongoose";
 
-const SavingsPlanSchema = new mongoose.Schema({
-  // userId: {
-  //   type: mongoose.Schema.Types.ObjectId,
-  //   ref: "User",
-  //   required: true,
-  // },
 
-  foodType: { type: String,
-     required: true },       // e.g "Rice", "Beans"
 
-  targetAmount: { type: Number, 
-    required: true },   // e.g 20000
+const userSchema = new mongoose.Schema({
+  firstname: { type: String, required: true },
+  lastname: { type: String, required: true },   
+  email: { type: String, required: true, unique: true, lowercase: true },
+  password: { type: String, required: true },
+  isAdmin: { type: Boolean, default: false },
 
-  frequency: { type: String, enum: ["daily", "weekly", "monthly"],
-     required: true },
+  selectedFoodPackages: { 
+    type: [mongoose.Schema.Types.ObjectId],
+    ref: "FoodPackage",
+   default: [] 
+   },
 
-  isActive: { type: Boolean,
-     default: true }, // paused or running
-});
+   customPackageItems: [{
+    name: String,
+    quantity: Number,
+    unit: String
+  }],
 
-export default mongoose.model("SavingsPlan", SavingsPlanSchema);
+  hasCompletedPackageSelection: { 
+    type: Boolean, 
+    default: false 
+  }
+}, 
+{ timestamps: true }); 
+
+export default mongoose.model("User", userSchema);
+
+
+

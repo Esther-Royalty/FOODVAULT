@@ -19,6 +19,8 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^9.0.0",
+    "paystack": "^2.0.1",
+    "paystack-node": "^0.3.0",
     "salt": "^0.5.5"
   },
   "devDependencies": {
