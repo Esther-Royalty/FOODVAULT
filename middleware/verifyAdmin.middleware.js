@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import SavingsPlan from "../models/savingsPlan.js"; // Model for savings plans
+import SavingsPlan from "../models/SavingsPlan.js"; // Model for savings plans
 import User from "../models/user.model.js";        // Model for users
 
 

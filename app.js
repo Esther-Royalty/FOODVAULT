@@ -1,15 +1,15 @@
+import dotenv from "dotenv";
+dotenv.config({ path: ".env.development.local" });
 import express from "express";
 import { PORT } from "./config/env.js";
 import { connectDB } from "./database/mongodb.js";
 import cors from "cors";
-import dotenv from "dotenv";
 import foodRoutes from "./routes/food.routes.js";
 import paymentRoutes from "./routes/payment.routes.js";
 import authRoutes from "./routes/auth.routes.js";
-import savingsRoutes from "./routes/user.routes.js";
+import savingsRoutes from "./routes/savings.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
-
-
+import errorHandler from "./middleware/errorHandler.js";
 
 
 
@@ -54,6 +54,7 @@ app.use("/api/v1/payments", paymentRoutes);
 
 app.post("/api/v1/payments/webhook/paystack", express.raw({ type: "application/json"}), paymentRoutes)
 
+app.use(errorHandler);
 
 
 connectDB().then(() => {

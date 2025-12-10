@@ -1,133 +1,146 @@
 import mongoose from "mongoose";
-import Transaction from "../models/transaction.model.js";
-import savingsPlan from "../models/savingsPlan.js";
+// import Transaction from "../models/transaction.model.js";
+import SavingsPlan from "../models/SavingsPlan.js";
 import User from "../models/user.model.js";
 import FoodPackage from "../models/foodPackage.model.js";
+import Wallet from "../models/wallet.js";
 import Paystack from "paystack";
+
+
+
+
 const client = new Paystack(process.env.PAYSTACK_SECRET_KEY);
 
 
-
-export const createSavingsPlan = async (req, res) => {
+export const createSavingsPlan = async (req, res, next) => {
   try {
-    const userId = req.user._id; // from JWT
-    if (!userId) {
-      return res.status(401).json({ message: "user not authenticated" });
-    }
-    const {  foodType, targetAmount, frequency } = req.body;
+    const { title, description, targetAmount, monthlyAmount, weeklyAmount, durationMonths, paymentType, recurrence, autoDebit } = req.body;
 
-  if(!foodType || !targetAmount || !frequency){
-    return res.status(400).json({ message: "All fields are required"});
-  }
+    // Validation
+    if (durationMonths < 3) return res.status(400).json({
 
-    const plan = await savingsPlan.create({
-      userId: req.user._id,
-      foodType,
-      targetAmount: Number(targetAmount),
-      frequency
- // startDate: new Date(),
+       success: false, message: "Minimum duration is 3 months" });
+
+    if (monthlyAmount * durationMonths < targetAmount) 
+      return res.status(400).json({ 
+
+    success: false, message: "Monthly amount too low to reach target" });
+
+    if (weeklyAmount * durationMonths < targetAmount) 
+      return res.status(400).json({ 
+ success: false, message: "Weekly amount too low to reach target" });
+
+    // ✅ Use the model to create
+    const newPlan = await SavingsPlan.create({
+      user: req.userId,
+      title,
+      description,
+      targetAmount,
+      monthlyAmount,
+      weeklyAmount,
+      durationMonths,
+      paymentType: paymentType || "one-time",
+      recurrence: recurrence || "monthly",
+      autoDebit: autoDebit || false
     });
-  
-    await plan.save();
-  
-    res.status(201).json({ message: "Savings plan created successfully", plan });
+
+    // ✅ Use the variable only after creation
+    return res.status(201).json({
+      success: true,
+      message: "Savings plan created successfully",
+      data: newPlan
+    });
   } catch (error) {
-    res.status(500).json({ message:"Something went wrong", error: error.message });
+    next(error);
   }
 };
 
 
-export const getMyPlans = async (req, res) => {
-  try {
-    
-    
-    const userId = req.user._id; // from JWT
 
-    // Convert to ObjectId properly
-    const plans = await savingsPlan.find({ userId: req.user._id });
+export const getSavingsPlan = async (req, res, next) => {
+    try {
+        const savingsPlan = await savingsPlan.findOne({
+            _id: req.params.id,
+            user: req.userId
+        });
 
-    if (!plans || plans.length === 0) {
-      return res.status(200).json({ message: "No savings plans found", plans: [] });
+        if (!savingsPlan) {
+            return res.status(404).json({
+                success: false,
+                message: "Savings plan not found"
+            });
+        }
+
+        res.json({
+            success: true,
+            data: savingsPlan
+        });
+    } catch (error) {
+        next(error);
     }
-
-    res.status(200).json({ 
-      message: "Savings plans retrieved successfully", 
-      plans 
-    });
-  } catch (error) {
-    console.error( {message: "Get plans error", error} );
-    res.status(500).json({ message: "Something went wrong", error: error.message });
-  }
 };
 
-export const updateSavingsPlan = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { foodType, targetAmount, frequency} = req.body;
+export const getMyPlans = async (req, res, next) => {
+    try {
+        const savingsPlans = await SavingsPlan.find({ user: req.userId }).sort({ createdAt: -1 });
 
-    // THIS IS THE FIX – use ._id (not .id)
-    if (!req.user?._id) {
-      return res.status(401).json({ message: "Unauthorized - No user found" });
+        res.json({
+            success: true,
+            count: savingsPlans.length,
+            data: savingsPlans
+        });
+    } catch (error) {
+        next(error);
     }
-
-    // Validate ID format
-    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({ message: "Invalid savings plan ID" });
-    }
-
-    const updates = {
-      ...(foodType && { foodType }),
-      ...(frequency && { frequency }),
-      ...(typeof isActive === "boolean" && { isActive }),
-      ...(targetAmount !== undefined && { targetAmount: Number(targetAmount) }),
-    };
-
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ message: "No fields to update" });
-    }
-
-    const updatedPlan = await savingsPlan.findOneAndUpdate(
-      { 
-        _id: id, 
-        userId: req.user._id   // ← THIS MUST BE ._id
-      },
-      { $set: updates },
-      { new: true, runValidators: true }
-    );
-
-    if (!updatedPlan) {
-      return res.status(404).json({ message: "Savings plan not found or not owned by you" });
-    }
-
-    return res.status(200).json({
-      message: "Savings plan updated successfully",
-      plan: updatedPlan
-    });
-
-  } catch (error) {
-    console.error("Update error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
 };
 
-export const deleteSavingsPlan = async (req, res) => {
-  try {
-    const { id } = req.params; // plan ID from URL
+export const updateSavingsPlan = async (req, res, next) => {
+    try {
+        const savingsPlan = await SavingsPlan.findOneAndUpdate(
+            { _id: req.params.id, user: req.userId, status: "active" },
+            req.body,
+            { new: true, runValidators: true }
+        );
 
-    // Find the plan and ensure it belongs to the logged-in user
-    const plan = await savingsPlan.findOne({ _id: id, userId: req.user._id });
-    if (!plan) {
-      return res.status(404).json({ message: "Savings plan not found" });
+        if (!savingsPlan) {
+            return res.status(404).json({
+                success: false,
+                message: "Savings plan not found or cannot be updated"
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Savings plan updated successfully",
+            data: savingsPlan
+        });
+    } catch (error) {
+        next(error);
     }
+};
 
-    // Delete the plan
-    await plan.deleteOne();
+export const deleteSavingsPlan = async (req, res, next) => {
+    try {
+        const savingsPlan = await SavingsPlan.findOneAndUpdate(
+            { _id: req.params.id, user: req.userId, status: "active" },
+            { status: "cancelled" },
+            { new: true }
+        );
 
-    res.status(200).json({ message: "Savings plan deleted successfully" });
-  } catch (error) {
-    console.error("Unable to delete plan", error);
-    res.status(500).json({ message: "Something went wrong", error: error.message });
-  }
+        if (!savingsPlan) {
+            return res.status(404).json({
+                success: false,
+                message: "Savings plan not found"
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Savings plan cancelled successfully"
+        });
+    } catch (error) {
+        next(error);
+    }
 };
 
 export const getDashboard = async (req, res) => {
@@ -177,6 +190,50 @@ export const getDashboard = async (req, res) => {
   }
 };
 
+export const getSavingsProgress = async (req, res, next) => {
+    try {
+        const savingsPlan = await SavingsPlan.findOne({
+            _id: req.params.id,
+            user: req.userId
+        });
+
+        if (!savingsPlan) {
+            return res.status(404).json({
+                success: false,
+                message: "Savings plan not found"
+            });
+        }
+
+        const progress = {
+            currentBalance: savingsPlan.currentBalance,
+            targetAmount: savingsPlan.targetAmount,
+            monthlyAmount: savingsPlan.monthlyAmount,
+            progressPercentage: (savingsPlan.currentBalance / savingsPlan.targetAmount) * 100,
+            monthsRemaining: savingsPlan.durationMonths,
+            monthsCompleted: Math.floor(savingsPlan.currentBalance / savingsPlan.monthlyAmount),
+            amountRemaining: savingsPlan.targetAmount - savingsPlan.currentBalance,
+            startDate: savingsPlan.startDate,
+            endDate: savingsPlan.endDate,
+            nextPaymentDate: savingsPlan.nextPaymentDate
+        };
+
+        res.json({
+            success: true,
+            data: progress
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export default {
+    createSavingsPlan,
+    getSavingsPlan,
+    getMyPlans,
+    updateSavingsPlan,
+    deleteSavingsPlan,
+    getSavingsProgress
+};
 
 export const getFoodPackages = async (req, res) => {
   try {

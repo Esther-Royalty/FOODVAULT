@@ -3,70 +3,209 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { JWT_EXPIRES_IN, JWT_SECRET } from "../config/env.js";
 
- 
+import Wallet from "../models/wallet.js";
+import { generateTokens } from "../utils/generateTokens.js";
 
 
-export const register = async (req, res) => {
+
+// Register user
+const register = async (req, res, next) => {
     try {
-    const { firstname, lastname, email, password } = req.body;
+        const { firstName, lastName, email, password, phone } = req.body;
 
-    if (!firstname || !lastname || (!email || !password))
-      return res.status(400).json(({error: "All fields are required!"}))
+        // Check if user exists
+        const existingUser = await User.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({
+                success: false,
+                message: "User already exists with this email"
+            });
+        }
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists!" });
+        // Create user
+        const user = await User.create({
+            firstName,
+            lastName,
+            email,
+            password,
+            phone
+        });
+
+        // Create wallet for user
+        await Wallet.create({
+            user: user._id
+        });
+
+        // Generate tokens
+        const { accessToken, refreshToken } = generateTokens(user._id);
+
+        // Save refresh token to user
+        user.refreshToken = refreshToken;
+        await user.save();
+
+        // Remove sensitive data
+        const userResponse = {
+            _id: user._id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phone: user.phone,
+            createdAt: user.createdAt
+        };
+
+        res.status(201).json({
+            success: true,
+            message: "User registered successfully",
+            data: {
+                user: userResponse,
+                tokens: {
+                    accessToken,
+                    refreshToken
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
     }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const newUser = await User.create({
-      firstname,
-      lastname,
-      email,
-      password: hashedPassword
-    });
-
-    res.status(201).json({ message: "User registered successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Something went wrong", error: error.message });
-  }
 };
 
-export const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+// Login user
+const login = async (req, res, next) => {
+    try {
+        const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json ({message: "Email and password are required!"})
+        // Check if user exists
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password"
+            });
+        }
+
+        // Check password
+        const isPasswordValid = await user.comparePassword(password);
+        if (!isPasswordValid) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password"
+            });
+        }
+
+        // Generate tokens
+        const { accessToken, refreshToken } = generateTokens(user._id);
+
+        // Save refresh token
+        user.refreshToken = refreshToken;
+        await user.save();
+
+        // Remove sensitive data
+        const userResponse = {
+            _id: user._id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            phone: user.phone,
+            isEmailVerified: user.isEmailVerified,
+            createdAt: user.createdAt
+        };
+
+        res.json({
+            success: true,
+            message: "Login successful",
+            data: {
+                user: userResponse,
+                tokens: {
+                    accessToken,
+                    refreshToken
+                }
+            }
+        });
+    } catch (error) {
+        next(error);
     }
-
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "User does not exist!" });
-    const correctPassword = await bcrypt.compare(password, user.password);
-    if (!correctPassword) return res.status(400).json({ message: "Incorrect password!" });
-
-    const token = jwt.sign(
-      { _id: user._id, isAdmin: user.isAdmin }, JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN });
-
-//       const token = jwt.sign(
-//   { _id: user._id },      // THIS PART WAS MISSING
-//   JWT_SECRET,
-//   { expiresIn: "1h" }
-// );
-
-    res.status(200).json({ message: "Login successful", token,
-      data:{
-      id: user._id,
-      firstname: user.firstname,
-      lastname: user.lastname,
-      email: user.email
-    },
-  });
-  } catch (error) {
-    res.status(500).json({ message: "Could not login", error: error.message });
-  }
 };
 
+// Refresh token
+const refreshToken = async (req, res, next) => {
+    try {
+        const { refreshToken } = req.body;
+
+        if (!refreshToken) {
+            return res.status(400).json({
+                success: false,
+                message: "Refresh token is required"
+            });
+        }
+
+        // Find user with this refresh token
+        const user = await User.findOne({ refreshToken });
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid refresh token"
+            });
+        }
+
+        // Generate new tokens
+        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = generateTokens(user._id);
+
+        // Update refresh token
+        user.refreshToken = newRefreshToken;
+        await user.save();
+
+        res.json({
+            success: true,
+            data: {
+                accessToken: newAccessToken,
+                refreshToken: newRefreshToken
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Logout
+const logout = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.userId);
+        if (user) {
+            user.refreshToken = null;
+            await user.save();
+        }
+
+        res.json({
+            success: true,
+            message: "Logged out successfully"
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Get current user
+const getMe = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.userId).select("-password -refreshToken");
+        const wallet = await Wallet.findOne({ user: req.userId });
+
+        res.json({
+            success: true,
+            data: {
+                user,
+                wallet
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+export default {
+    register,
+    login,
+    refreshToken,
+    logout,
+    getMe
+};

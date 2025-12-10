@@ -1,5 +1,5 @@
 // import the SavingsPlan Mongoose model to query the savings plans collection
-import SavingsPlan from "../models/savingsPlan.js";   // (imports the SavingsPlan schema/model)
+import SavingsPlan from "../models/SavingsPlan.js";   // (imports the SavingsPlan schema/model)
 
 // import mongoose for ObjectId validation and other utilities
 import mongoose from "mongoose";                      // (used below to validate planId)

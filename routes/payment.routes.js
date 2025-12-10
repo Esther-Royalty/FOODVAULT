@@ -1,18 +1,21 @@
 import express from "express";
-import { auth } from "../middleware/auth.middleware.js";
-import { initializePayment, verifyPayment } from "../controllers/user.controller.js";
-import { paystackWebhook } from "../controllers/payment.controller.js";
+import paymentController from "../controllers/payment.controller.js";
+import auth from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
-// Initialize payment (frontend hits this)
-router.post("/initialize", initializePayment);
+// Apply auth middleware to all routes except webhook
+router.use(auth);
 
-// Verify payment (Paystack webhook or after redirect)
-router.get("/verify", verifyPayment);
+router.post("/initialize", paymentController.initializePayment);
+router.get("/verify", paymentController.verifyPayment);
+router.get("/transactions", paymentController.getTransactions);
 
-// Paystack Webhook (NO auth middleware)
-router.post("/webhook/paystack", paystackWebhook);
-router.get("/test", (req, res) => {res.send("Payment route is working")});
+// Webhook endpoint (no auth required)
+router.post(
+    "/webhook/paystack",
+    express.raw({ type: "application/json" }),
+    paymentController.paystackWebhook
+);
 
 export default router;
