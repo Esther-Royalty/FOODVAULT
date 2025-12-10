@@ -1,5 +1,6 @@
 
 import mongoose from "mongoose";
+// import dedicated_nuban from "paystack-node/src/endpoints/dedicated_nuban";
 
 
 
@@ -8,7 +9,7 @@ const userSchema = new mongoose.Schema({
   lastname: { type: String, required: true },   
   email: { type: String, required: true, unique: true, lowercase: true },
   password: { type: String, required: true },
-  isAdmin: { type: Boolean, default: false },
+  isAdmin: { type: Boolean, default: true },
 
   selectedFoodPackages: { 
     type: [mongoose.Schema.Types.ObjectId],
@@ -25,9 +26,21 @@ const userSchema = new mongoose.Schema({
   hasCompletedPackageSelection: { 
     type: Boolean, 
     default: false 
-  }
 }, 
+//vital account details for payments
+virtualAccount:{
+accountNumber: String,
+accountName: String,
+bankName: String,
+bankCode: String,
+customerId: String,
+dedicatedAccountId: String,
+provider: {type: String, default: "paystack"}
+}
+},
 { timestamps: true }); 
+
+
 
 export default mongoose.model("User", userSchema);
 

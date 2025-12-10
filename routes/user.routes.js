@@ -8,9 +8,9 @@ router.post("/user/create", auth, createSavingsPlan);
 router.get("/user/plan", auth, getMyPlans);
 router.put("/user/update/:id", auth, updateSavingsPlan);
 router.delete("/user/delete/:id", auth, deleteSavingsPlan);
-router.get("/user/dashboard",  getDashboard);
+router.get("/user/dashboard", auth, getDashboard);
 router.get("/packages",  getFoodPackages);
-router.post("/select-package",  selectFoodPackage);
+router.post("/select-package", auth, selectFoodPackage);
 
 // routes/test.js
 router.get("/me", auth, (req, res) => {

@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
-import SavingsPlan from "../models/savingsPlan.js";
+import Transaction from "../models/transaction.model.js";
+import savingsPlan from "../models/savingsPlan.js";
 import User from "../models/user.model.js";
 import FoodPackage from "../models/foodPackage.model.js";
 import Paystack from "paystack";
@@ -19,19 +20,15 @@ export const createSavingsPlan = async (req, res) => {
     return res.status(400).json({ message: "All fields are required"});
   }
 
-    const plan = await SavingsPlan.create({
+    const plan = await savingsPlan.create({
       userId: req.user._id,
       foodType,
       targetAmount: Number(targetAmount),
       frequency
-
-
-      // // Optionally set default values like:
-      // currentAmount: 0,
-      // status: 'active',
-      // startDate: new Date(),
+ // startDate: new Date(),
     });
   
+    await plan.save();
   
     res.status(201).json({ message: "Savings plan created successfully", plan });
   } catch (error) {
@@ -47,7 +44,7 @@ export const getMyPlans = async (req, res) => {
     const userId = req.user._id; // from JWT
 
     // Convert to ObjectId properly
-    const plans = await SavingsPlan.find({ userId: req.user._id });
+    const plans = await savingsPlan.find({ userId: req.user._id });
 
     if (!plans || plans.length === 0) {
       return res.status(200).json({ message: "No savings plans found", plans: [] });
@@ -89,7 +86,7 @@ export const updateSavingsPlan = async (req, res) => {
       return res.status(400).json({ message: "No fields to update" });
     }
 
-    const updatedPlan = await Savingsplan.findOneAndUpdate(
+    const updatedPlan = await savingsPlan.findOneAndUpdate(
       { 
         _id: id, 
         userId: req.user._id   // ← THIS MUST BE ._id
@@ -118,7 +115,7 @@ export const deleteSavingsPlan = async (req, res) => {
     const { id } = req.params; // plan ID from URL
 
     // Find the plan and ensure it belongs to the logged-in user
-    const plan = await SavingsPlan.findOne({ _id: id, userId: req.user._id });
+    const plan = await savingsPlan.findOne({ _id: id, userId: req.user._id });
     if (!plan) {
       return res.status(404).json({ message: "Savings plan not found" });
     }
@@ -135,20 +132,23 @@ export const deleteSavingsPlan = async (req, res) => {
 
 export const getDashboard = async (req, res) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
     const userId = req.user._id;
 
-    // Fetch all savings plans for this user
-    const plans = await SavingsPlan.find({ userId: req.user._id });
+    const plans = await savingsPlan.find({ userId });
 
-    // Calculate totals and counts
     const totalPlans = plans.length;
-    const totalTargetAmount = plans.reduce((sum, p) => sum + p.targetAmount, 0);
+    const totalTargetAmount = plans.reduce(
+      (sum, p) => sum + p.targetAmount,
+      0
+    );
 
-    // Count auto-deduction plans vs manual payment
     const autoDeductionPlans = plans.filter(p => p.isAutoDeduction).length;
     const manualPlans = totalPlans - autoDeductionPlans;
 
-    // You can also calculate progress for each plan if you track amountSaved
     const plansWithProgress = plans.map(p => ({
       id: p._id,
       foodType: p.foodType,
@@ -156,8 +156,9 @@ export const getDashboard = async (req, res) => {
       frequency: p.frequency,
       isActive: p.isActive,
       isAutoDeduction: p.isAutoDeduction || false,
-      // amountSaved: p.amountSaved || 0, // uncomment if you track saved amount
-      progress: p.amountSaved ? ((p.amountSaved / p.targetAmount) * 100).toFixed(2) : "0",
+      progress: p.amountSaved
+        ? ((p.amountSaved / p.targetAmount) * 100).toFixed(2)
+        : "0",
     }));
 
     res.status(200).json({
@@ -169,7 +170,10 @@ export const getDashboard = async (req, res) => {
     });
   } catch (error) {
     console.error("Dashboard error:", error);
-    res.status(500).json({ message: "Something went wrong", error: error.message });
+    res.status(500).json({
+      message: "Something went wrong",
+      error: error.message
+    });
   }
 };
 
@@ -185,13 +189,15 @@ export const getFoodPackages = async (req, res) => {
 
 export const selectFoodPackage = async (req, res) => {
   try {
-    const { packageId, customItems } = req.body; // customItems only if "Custom"
+    const { packageId, custom, customItems } = req.body;
 
-    if (!req.user?._id) return res.status(401).json({ message: "Unauthorized" });
+    if (!req.user?._id) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
 
     let selectedPackage;
 
-    if (packageId === "custom" || !packageId) {
+    if (custom) {
       // Create a custom package for this user
       selectedPackage = await FoodPackage.create({
         name: "Custom",
@@ -201,19 +207,23 @@ export const selectFoodPackage = async (req, res) => {
         customItems: customItems || []
       });
     } else {
-      // Validate predefined package exists
+      // Validate that the predefined package exists
+      if (!packageId) {
+        return res.status(400).json({ message: "Package ID is required for predefined packages" });
+      }
+
       selectedPackage = await FoodPackage.findById(packageId);
       if (!selectedPackage) {
         return res.status(404).json({ message: "Package not found" });
       }
     }
 
-    // Update user's selected package
+    // Update the user's selected package
     const user = await User.findByIdAndUpdate(
       req.user._id,
       {
         selectedPackage: selectedPackage._id,
-        customPackageItems: packageId === "custom" ? customItems : [],
+        customPackageItems: custom ? customItems : [],
         hasCompletedPackageSelection: true
       },
       { new: true }
@@ -222,15 +232,16 @@ export const selectFoodPackage = async (req, res) => {
     res.json({
       message: "Food package selected successfully!",
       user: {
-        name: user.name,
+        firstname: user.firstname,
+        lastname: user.lastname,
         selectedPackage: user.selectedPackage,
-        hasCompletedPackageSelection: true
+        hasCompletedPackageSelection: user.hasCompletedPackageSelection
       }
     });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    console.error("selectFoodPackage error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -243,13 +254,18 @@ export const initializePayment = async (req, res) => {
       return res.status(400).json({ message: "Amount and email required" });
     }
 
+    console.log("Initializing payment for:", { email, amount, planId });
+    console.log("Paystack key:", process.env.PAYSTACK_SECRET_KEY);
+
     const transaction = await client.transaction.initialize({
-      email,
+      email: email, // use the email from request
       amount: amount * 100, // Paystack uses kobo
+      reference: `FOODVAULT_${Date.now()}`,
       metadata: {
-        userId: req.user._id.toString(),
+        userId: req.user?._id.toString() || null,
         planId: planId || null
-      }
+      },
+      callback_url: "http://localhost:3000/api/v1/payment/verify"
     });
 
     res.json({
@@ -257,48 +273,85 @@ export const initializePayment = async (req, res) => {
       reference: transaction.data.reference
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Payment initialization failed" });
+    console.error("Initialization error:", err);
+    res.status(500).json({
+      message: "Payment initialization failed",
+      error: err?.response?.data || err.message
+    });
   }
 };
 
-// 2. Verify Payment (Webhook or after redirect)
-export const verifyPayment = async (req, res) => {
+// 2. Verify Paystack Payment (Webhook or after redirect)
+export const verifyPayment = async (req, res) => { 
   const ref = req.query.reference;
+
+  if (!ref) {
+    return res.status(400).json({ message: "Reference is required" });
+  }
+
+  console.log(`Verifying payment for reference: ${ref}`);
 
   try {
     const verification = await client.transaction.verify(ref);
+    console.log("Paystack raw verification response:", verification);
 
-    if (verification.data.status === "success") {
-      const { metadata, amount, customer } = verification.data;
+    // ---- SAFETY CHECK ----
+    if (!verification || !verification.data) {
+      console.log("Invalid response from Paystack");
+      return res.redirect("https://foodvault-36sx.onrender.com/payment-failed");
+    }
 
-      // Mark user's plan as funded or create transaction record
-      // Example: update savings plan
-      if (metadata.planId) {
-        await SavingsPlan.findByIdAndUpdate(metadata.planId, {
-          $inc: { currentAmount: amount / 100 },
-          lastPaymentRef: ref
-        });
+    // ---- PAYMENT FAILED ----
+    if (verification.data.status !== "success") {
+      console.log("Payment not successful");
+      return res.redirect("https://foodvault-36sx.onrender.com/payment-failed");
+    }
+
+    const { metadata, amount } = verification.data;
+
+    // ---- PREVENT DOUBLE CREDITING ----
+    const existingTxn = await Transaction.findOne({ paymentRef: ref });
+
+    if (existingTxn) {
+      console.log("Duplicate transaction attempt blocked.");
+      return res.redirect(`https://foodvault-36sx.onrender.com/payment-success?ref=${ref}`);
+    }
+
+    // ---- PROCESS SAVINGS PLAN PAYMENT ----
+    if (metadata?.planId) {
+      const plan = await savingsPlan.findById(metadata.planId);
+
+      if (!plan) {
+        console.log("Plan not found");
+        return res.redirect("https://foodvault-36sx.onrender.com/payment-failed");
       }
 
-      // Redirect user to success page
-      return res.redirect(`https://yourapp.com/payment-success?ref=${ref}`);
-    } else {
-      return res.redirect(`https://yourapp.com/payment-failed`);
+      // Convert kobo → naira
+      const paidAmount = amount / 100;
+
+      // Update plan balance
+      await savingsPlan.findByIdAndUpdate(metadata.planId, {
+        $inc: { currentAmount: paidAmount },
+        lastPaymentRef: ref,
+      });
+
+      // Save transaction record
+      await Transaction.create({
+        planId: metadata.planId,
+        amount: paidAmount,
+        type: "deduction",
+        paymentRef: ref,
+      });
     }
+
+    // ---- REDIRECT ON SUCCESS ----
+    return res.redirect(`https://foodvault-36sx.onrender.com/payment-success?ref=${ref}`);
+
   } catch (err) {
-    res.redirect(`https://yourapp.com/payment-failed`);
+    console.error("Paystack verification error:", err.response?.data || err);
+    return res.redirect("https://foodvault-36sx.onrender.com/payment-failed");
   }
 };
-
-
-// Update only the fields provided
-    // if (foodType) plan.foodType = foodType;
-    // if (targetAmount) plan.targetAmount = Number(targetAmount);
-    // if (frequency) plan.frequency = frequency;
-    // if (typeof isActive === "boolean") plan.isActive = isActive;
-
-    // await plan.save();
 
 
 

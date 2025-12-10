@@ -7,6 +7,11 @@ const TransactionSchema = new mongoose.Schema({
     required: true,
   },
 
+  paymentRef: {
+    type: String,
+    unique: true,
+  },
+
   amount: { type: Number, required: true },
   type: { type: String, 
     enum: ["deduction"], default: "deduction" },
