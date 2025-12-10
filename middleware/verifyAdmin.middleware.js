@@ -1,6 +1,6 @@
-import mongoose from "mongoose";
-import SavingsPlan from "../models/SavingsPlan.js"; // Model for savings plans
-import User from "../models/user.model.js";        // Model for users
+// import mongoose from "mongoose";
+// import SavingsPlan from "../models/SavingsPlan.js"; // Model for savings plans
+// import User from "../models/user.model.js";        // Model for users
 
 
 
