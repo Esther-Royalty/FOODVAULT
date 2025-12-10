@@ -1,4 +1,4 @@
-import Food from "../models/Food.js";
+import Food from "../models/food.js";
 
 
 // ADMIN: Add a food item
