@@ -115,7 +115,7 @@ export const verifyPayment = async (req, res, next) => {
 
         // If already verified
         if (transaction.status === "successful") {
-            return res.json({
+            return res.status(200).json({
                 success: true,
                 message: "Payment already verified",
                 data: transaction

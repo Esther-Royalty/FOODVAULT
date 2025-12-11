@@ -22,6 +22,7 @@ app.use(express.json());
 
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://localhost:5173', 
   'https://foodvault-36sx.onrender.com',
   process.env.FRONTEND_URL,
 ].filter(Boolean);
