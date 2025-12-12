@@ -17,18 +17,42 @@ export const createSavingsPlan = async (req, res, next) => {
     const { title, description, targetAmount, monthlyAmount, weeklyAmount, durationMonths, paymentType, recurrence, autoDebit } = req.body;
 
     // Validation
-    if (durationMonths < 3) return res.status(400).json({
+    if (durationMonths < 3) {
+      return res.status(400).json({
+        success: false,
+        message: "Minimum duration is 3 months"
+      });
+    }
 
-       success: false, message: "Minimum duration is 3 months" });
+    let projectedSavings = 0;
 
-    if (monthlyAmount * durationMonths < targetAmount) 
-      return res.status(400).json({ 
+    if (recurrence === "weekly") {
+      if (!weeklyAmount || weeklyAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Weekly amount is required for weekly savings plans"
+        });
+      }
+      // Approximating 4 weeks per month for safety margin in validation, or 52 weeks / 12 months
+      // conservative check: 4 * durationMonths * weeklyAmount
+      projectedSavings = weeklyAmount * 4 * durationMonths;
+    } else {
+      // Default to monthly if not specified or explicitly monthly
+      if (!monthlyAmount || monthlyAmount <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Monthly amount is required for monthly savings plans"
+        });
+      }
+      projectedSavings = monthlyAmount * durationMonths;
+    }
 
-    success: false, message: "Monthly amount too low to reach target" });
-
-    if (weeklyAmount * durationMonths < targetAmount) 
-      return res.status(400).json({ 
- success: false, message: "Weekly amount too low to reach target" });
+    if (projectedSavings < targetAmount) {
+      return res.status(400).json({
+        success: false,
+        message: `${recurrence === 'weekly' ? 'Weekly' : 'Monthly'} amount too low to reach target`
+      });
+    }
 
     // ✅ Use the model to create
     const newPlan = await SavingsPlan.create({
@@ -37,7 +61,7 @@ export const createSavingsPlan = async (req, res, next) => {
       description,
       targetAmount,
       monthlyAmount,
-      weeklyAmount,
+      weeklyAmount, // Now included in schema
       durationMonths,
       paymentType: paymentType || "one-time",
       recurrence: recurrence || "monthly",
@@ -58,89 +82,89 @@ export const createSavingsPlan = async (req, res, next) => {
 
 
 export const getSavingsPlan = async (req, res, next) => {
-    try {
-        const savingsPlan = await savingsPlan.findOne({
-            _id: req.params.id,
-            user: req.userId
-        });
+  try {
+    const savingsPlan = await SavingsPlan.findOne({
+      _id: req.params.id,
+      user: req.userId
+    });
 
-        if (!savingsPlan) {
-            return res.status(404).json({
-                success: false,
-                message: "Savings plan not found"
-            });
-        }
-
-        res.json({
-            success: true,
-            data: savingsPlan
-        });
-    } catch (error) {
-        next(error);
+    if (!savingsPlan) {
+      return res.status(404).json({
+        success: false,
+        message: "Savings plan not found"
+      });
     }
+
+    res.json({
+      success: true,
+      data: savingsPlan
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const getMyPlans = async (req, res, next) => {
-    try {
-        const savingsPlans = await SavingsPlan.find({ user: req.userId }).sort({ createdAt: -1 });
+  try {
+    const savingsPlans = await SavingsPlan.find({ user: req.userId }).sort({ createdAt: -1 });
 
-        res.json({
-            success: true,
-            count: savingsPlans.length,
-            data: savingsPlans
-        });
-    } catch (error) {
-        next(error);
-    }
+    res.json({
+      success: true,
+      count: savingsPlans.length,
+      data: savingsPlans
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const updateSavingsPlan = async (req, res, next) => {
-    try {
-        const savingsPlan = await SavingsPlan.findOneAndUpdate(
-            { _id: req.params.id, user: req.userId, status: "active" },
-            req.body,
-            { new: true, runValidators: true }
-        );
+  try {
+    const savingsPlan = await SavingsPlan.findOneAndUpdate(
+      { _id: req.params.id, user: req.userId, status: "active" },
+      req.body,
+      { new: true, runValidators: true }
+    );
 
-        if (!savingsPlan) {
-            return res.status(404).json({
-                success: false,
-                message: "Savings plan not found or cannot be updated"
-            });
-        }
-
-        return res.status(200).json({
-            success: true,
-            message: "Savings plan updated successfully",
-            data: savingsPlan
-        });
-    } catch (error) {
-        next(error);
+    if (!savingsPlan) {
+      return res.status(404).json({
+        success: false,
+        message: "Savings plan not found or cannot be updated"
+      });
     }
+
+    return res.status(200).json({
+      success: true,
+      message: "Savings plan updated successfully",
+      data: savingsPlan
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const deleteSavingsPlan = async (req, res, next) => {
-    try {
-        const savingsPlan = await SavingsPlan.findOneAndUpdate(
-            { _id: req.params.id, user: req.userId, status: "active" },
-            { status: "cancelled" },
-            { new: true }
-        );
+  try {
+    const savingsPlan = await SavingsPlan.findOneAndUpdate(
+      { _id: req.params.id, user: req.userId, status: "active" },
+      { status: "cancelled" },
+      { new: true }
+    );
 
-        if (!savingsPlan) {
-            return res.status(404).json({
-                success: false,
-                message: "Savings plan not found"
-            });
-        }
-
-        res.json({
-            success: true,
-            message: "Savings plan cancelled successfully"
-        });
-    } catch (error) {
-        next(error);
+    if (!savingsPlan) {
+      return res.status(404).json({
+        success: false,
+        message: "Savings plan not found"
+      });
     }
+
+    res.json({
+      success: true,
+      message: "Savings plan cancelled successfully"
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const getDashboard = async (req, res) => {
@@ -191,48 +215,48 @@ export const getDashboard = async (req, res) => {
 };
 
 export const getSavingsProgress = async (req, res, next) => {
-    try {
-        const savingsPlan = await SavingsPlan.findOne({
-            _id: req.params.id,
-            user: req.userId
-        });
+  try {
+    const savingsPlan = await SavingsPlan.findOne({
+      _id: req.params.id,
+      user: req.userId
+    });
 
-        if (!savingsPlan) {
-            return res.status(404).json({
-                success: false,
-                message: "Savings plan not found"
-            });
-        }
-
-        const progress = {
-            currentBalance: savingsPlan.currentBalance,
-            targetAmount: savingsPlan.targetAmount,
-            monthlyAmount: savingsPlan.monthlyAmount,
-            progressPercentage: (savingsPlan.currentBalance / savingsPlan.targetAmount) * 100,
-            monthsRemaining: savingsPlan.durationMonths,
-            monthsCompleted: Math.floor(savingsPlan.currentBalance / savingsPlan.monthlyAmount),
-            amountRemaining: savingsPlan.targetAmount - savingsPlan.currentBalance,
-            startDate: savingsPlan.startDate,
-            endDate: savingsPlan.endDate,
-            nextPaymentDate: savingsPlan.nextPaymentDate
-        };
-
-        res.json({
-            success: true,
-            data: progress
-        });
-    } catch (error) {
-        next(error);
+    if (!savingsPlan) {
+      return res.status(404).json({
+        success: false,
+        message: "Savings plan not found"
+      });
     }
+
+    const progress = {
+      currentBalance: savingsPlan.currentBalance,
+      targetAmount: savingsPlan.targetAmount,
+      monthlyAmount: savingsPlan.monthlyAmount,
+      progressPercentage: (savingsPlan.currentBalance / savingsPlan.targetAmount) * 100,
+      monthsRemaining: savingsPlan.durationMonths,
+      monthsCompleted: Math.floor(savingsPlan.currentBalance / savingsPlan.monthlyAmount),
+      amountRemaining: savingsPlan.targetAmount - savingsPlan.currentBalance,
+      startDate: savingsPlan.startDate,
+      endDate: savingsPlan.endDate,
+      nextPaymentDate: savingsPlan.nextPaymentDate
+    };
+
+    res.json({
+      success: true,
+      data: progress
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export default {
-    createSavingsPlan,
-    getSavingsPlan,
-    getMyPlans,
-    updateSavingsPlan,
-    deleteSavingsPlan,
-    getSavingsProgress
+  createSavingsPlan,
+  getSavingsPlan,
+  getMyPlans,
+  updateSavingsPlan,
+  deleteSavingsPlan,
+  getSavingsProgress
 };
 
 export const getFoodPackages = async (req, res) => {
@@ -339,7 +363,7 @@ export const initializePayment = async (req, res) => {
 };
 
 // 2. Verify Paystack Payment (Webhook or after redirect)
-export const verifyPayment = async (req, res) => { 
+export const verifyPayment = async (req, res) => {
   const ref = req.query.reference;
 
   if (!ref) {

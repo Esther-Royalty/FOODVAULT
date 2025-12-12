@@ -22,8 +22,13 @@ export const savingsPlanSchema = new mongoose.Schema({
     },
     monthlyAmount: {
         type: Number,
-        required: [true, "Monthly savings amount is required"],
+        required: function () { return this.recurrence === 'monthly'; },
         min: [50, "Minimum monthly savings is 50"]
+    },
+    weeklyAmount: {
+        type: Number,
+        required: function () { return this.recurrence === 'weekly'; },
+        min: [100, "Minimum weekly savings is 100"]
     },
     durationMonths: {
         type: Number,

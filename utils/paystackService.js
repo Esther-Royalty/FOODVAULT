@@ -24,7 +24,7 @@ class PaystackService {
                     email,
                     amount: amount * 100, // convert to kobo
                     metadata,
-                    callback_url: `${process.env.FRONTEND_URL}/verify-payment`,
+                    callback_url: `${process.env.FRONTEND_URL}/payment/verify`,
                 }
             );
 
