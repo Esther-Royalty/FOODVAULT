@@ -12,6 +12,9 @@ import {
 import { auth } from "../middleware/auth.middleware.js";
 import { verifyAdmin } from "../middleware/verifyAdmin.middleware.js";
 
+import { validate } from "../middleware/validate.js";
+import { planIdSchema } from "../validations/admin.validation.js";
+
 const router = express.Router();
 
 // =========================
@@ -49,8 +52,8 @@ router.post("/admin/login", async (req, res) => {
 // =========================
 
 router.get("/admin/plans", auth, verifyAdmin, getAllSavingsPlans);
-router.patch("/admin/plan/:planId/activate", auth, verifyAdmin, activateSavingsPlan);
-router.delete("/admin/plan/:planId", auth, verifyAdmin, deleteSavingsPlan);
+router.patch("/admin/plan/:planId/activate", auth, verifyAdmin, validate(planIdSchema), activateSavingsPlan);
+router.delete("/admin/plan/:planId", auth, verifyAdmin, validate(planIdSchema), deleteSavingsPlan);
 router.get("/admin/stats", auth, verifyAdmin, getAdminStats);
 
 export default router;

@@ -8,30 +8,31 @@ const foodSchema = new mongoose.Schema({
     required: true,    // This field must be provided
     unique: true       // No two food items can have the same name
   },
-  
+
   // Price of the food item
   price: {
     type: Number,      // Must be a number
     required: true     // Cannot be empty
   },
-  
-  // Unit for the food item (e.g., bag, kg, piece)
+
+  // Unit for the food item (e.g., bag, kg, rubber)
   unit: {
     type: String,      // Must be a string
+    enum: ["bag", "kilo", "rubber"], // Allowed values
     default: "bag"     // If not provided, defaults to "bag"
   },
 
   // Available quantity of the food item
- Quantity: {
-      type: Number,    // Must be a number
-      default: 0,
-      required: true
+  Quantity: {
+    type: Number,    // Must be a number
+    default: 0,
+    required: true
   }
-}, 
-{
-  // Automatically create `createdAt` and `updatedAt` timestamps
-  timestamps: true
-});
+},
+  {
+    // Automatically create `createdAt` and `updatedAt` timestamps
+    timestamps: true
+  });
 
 // Export the model so it can be used in controllers
 export default mongoose.model("Food", foodSchema);

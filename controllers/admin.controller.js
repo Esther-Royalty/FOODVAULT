@@ -1,108 +1,85 @@
-// import the SavingsPlan Mongoose model to query the savings plans collection
-import SavingsPlan from "../models/SavingsPlan.js";   // (imports the SavingsPlan schema/model)
-
-// import mongoose for ObjectId validation and other utilities
-import mongoose from "mongoose";                      // (used below to validate planId)
-
-// NOTE: `User` is referenced in getAdminStats, so we must import it
-import User from "../models/user.model.js";          // (imports User model for admin stats)
-
-
+import SavingsPlan from "../models/SavingsPlan.js";
+import User from "../models/user.model.js";
+import logger from "../utils/logger.js";
 
 // GET ALL SAVINGS PLANS (Admin)
-export const getAllSavingsPlans = async (req, res) => {
+export const getAllSavingsPlans = async (req, res, next) => {
   try {
-    // Find all savings plans, populate the userId field with firstname, lastname, email from users, sort newest first
-    const plans = await SavingsPlan.find()                           // -> runs a query to get all documents in the SavingsPlan collection
-      .populate("userId", "firstname lastname email")                // -> replaces userId ObjectId with selected user fields
-      .sort({ createdAt: -1 });                                      // -> sorts by createdAt descending (newest first)
+    const plans = await SavingsPlan.find()
+      .populate("userId", "firstname lastname email")
+      .sort({ createdAt: -1 });
 
-    // Return the array of plans as JSON
-    res.json(plans);                                                 // -> sends HTTP 200 with plans array in JSON
+    logger.info(`Admin fetched ${plans.length} savings plans`);
+    res.json(plans);
   } catch (error) {
-    // If anything goes wrong, return a 500 and include the error
-    res.status(500).json({ message: "Something went wrong", error }); // -> HTTP 500 with error object
+    next(error);
   }
 };
 
 // ACTIVATE PLAN
-export const activateSavingsPlan = async (req, res) => {
+export const activateSavingsPlan = async (req, res, next) => {
   try {
-    const { planId } = req.params;                                   // -> extract planId from the URL params
+    const { planId } = req.params;
 
-    // Validate planId
-    if (!mongoose.Types.ObjectId.isValid(planId)) {
-      return res.status(400).json({ message: "Invalid plan ID" });
-    }
-
-    // Set isActive to true and return the updated plan
     const plan = await SavingsPlan.findByIdAndUpdate(
       planId,
       { isActive: true },
       { new: true }
     );
 
-    // If plan not found, return 404
-    if (!plan) return res.status(404).json({ message: "Savings plan not found" });
+    if (!plan) {
+      return res.status(404).json({ message: "Savings plan not found" });
+    }
 
-    // Return the updated plan
+    logger.info(`Admin activated savings plan: ${planId}`);
     res.json(plan);
   } catch (error) {
-    res.status(500).json({ message: "Something went wrong", error });
+    next(error);
   }
 };
 
 // DELETE PLAN
-export const deleteSavingsPlan = async (req, res) => {
+export const deleteSavingsPlan = async (req, res, next) => {
   try {
-    const { planId } = req.params;                                   // -> extract planId from URL
+    const { planId } = req.params;
 
-    // Validate planId
-    if (!mongoose.Types.ObjectId.isValid(planId)) {
-      return res.status(400).json({ message: "Invalid plan ID" });
+    const plan = await SavingsPlan.findByIdAndDelete(planId);
+
+    if (!plan) {
+      return res.status(404).json({ message: "Savings plan not found" });
     }
 
-    // Delete the document and return the deleted document
-    const plan = await SavingsPlan.findByIdAndDelete(planId);        // -> removes the document from DB
-
-    // If nothing was deleted (no matching id), return 404
-    if (!plan) return res.status(404).json({ message: "Savings plan not found" });
-
-    // Confirm deletion and include the deleted plan
+    logger.info(`Admin deleted savings plan: ${planId}`);
     res.json({ message: "Plan deleted successfully", plan });
   } catch (error) {
-    // Error handler
-    res.status(500).json({ message: "Something went wrong", error });
+    next(error);
   }
 };
 
-// GETADMINSTATS
-export const getAdminStats = async (req, res) => {
-  try { 
-    // Count total users in the User collection
-    const totalUsers = await User.countDocuments();                 // -> returns a number (count of users)
+// GET ADMIN STATS
+export const getAdminStats = async (req, res, next) => {
+  try {
+    // Run counts in parallel for performance
+    const [totalUsers, totalSavingsPlans, activeSavingsPlans, inactiveSavingsPlans] = await Promise.all([
+      User.countDocuments(),
+      SavingsPlan.countDocuments(),
+      SavingsPlan.countDocuments({ isActive: true }),
+      SavingsPlan.countDocuments({ isActive: false })
+    ]);
 
-    // Count all savings plans
-    const totalSavingsPlans = await SavingsPlan.countDocuments();   // -> total number of plans
+    logger.info("Admin fetched dashboard stats");
 
-    // Count plans where isActive is true
-    const activeSavingsPlans = await SavingsPlan.countDocuments({ isActive: true }); // -> number of active plans
-
-    // Count plans where isActive is false
-    const inactiveSavingsPlans = await SavingsPlan.countDocuments({ isActive: false }); // -> number of inactive plans
-    
-    // Return the aggregated counts as JSON
     res.json({
       totalUsers,
-      totalSavingsPlans,  
+      totalSavingsPlans,
       activeSavingsPlans,
-      inactiveSavingsPlans
+      inactiveSavingsPlans,
     });
   } catch (error) {
-    // Generic error handler
-    res.status(500).json({ message: "Something went wrong" });
+    next(error);
   }
 };
+
 
 
 

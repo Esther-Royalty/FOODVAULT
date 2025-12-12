@@ -9,7 +9,7 @@ import { generateTokens } from "../utils/generateTokens.js";
 
 
 // Register user
-const register = async (req, res, next) => {
+export const register = async (req, res, next) => {
     try {
         const { firstName, lastName, email, password, phone } = req.body;
 
@@ -70,7 +70,7 @@ const register = async (req, res, next) => {
 };
 
 // Login user
-const login = async (req, res, next) => {
+export const login = async (req, res, next) => {
     try {
         const { email, password } = req.body;
 
@@ -127,7 +127,7 @@ const login = async (req, res, next) => {
 };
 
 // Refresh token
-const refreshToken = async (req, res, next) => {
+export const refreshToken = async (req, res, next) => {
     try {
         const { refreshToken } = req.body;
 
@@ -167,7 +167,7 @@ const refreshToken = async (req, res, next) => {
 };
 
 // Logout
-const logout = async (req, res, next) => {
+export const logout = async (req, res, next) => {
     try {
         const user = await User.findById(req.userId);
         if (user) {
@@ -185,7 +185,7 @@ const logout = async (req, res, next) => {
 };
 
 // Get current user
-const getMe = async (req, res, next) => {
+ export const getMe = async (req, res, next) => {
     try {
         const user = await User.findById(req.userId).select("-password -refreshToken");
         const wallet = await Wallet.findOne({ user: req.userId });

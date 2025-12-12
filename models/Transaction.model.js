@@ -32,7 +32,7 @@ const transactionSchema = new mongoose.Schema({
     },
     paymentMethod: {
         type: String,
-        enum: ['paystack', 'bank_transfer', 'card'],
+        enum: ['paystack', 'bank_transfer', 'card', 'crypto'],
         default: 'paystack'
     },
     paystackReference: {
@@ -41,6 +41,12 @@ const transactionSchema = new mongoose.Schema({
         // sparse: true
     },
     paystackAccessCode: String,
+    // Crypto Fields
+    txHash: { type: String },
+    senderAddress: String,
+    network: String, // e.g., 'polygon', 'ethereum'
+    token: String,   // e.g., 'USDC', 'USDT'
+
     description: String,
     metadata: mongoose.Schema.Types.Mixed,
     completedAt: Date,
@@ -53,6 +59,7 @@ const transactionSchema = new mongoose.Schema({
 // Index for faster queries
 transactionSchema.index({ user: 1, createdAt: -1 });
 transactionSchema.index({ paystackReference: 1 }, { unique: true, sparse: true });
+transactionSchema.index({ txHash: 1 }, { unique: true, sparse: true });
 
 
 export default mongoose.model("Transaction", transactionSchema);
